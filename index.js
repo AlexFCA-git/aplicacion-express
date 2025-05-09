@@ -1,18 +1,15 @@
-// Importamos las librarías requeridas
-const express = require('express')
-const bodyParser = require('body-parser')
-const sqlite3 = require('sqlite3').verbose()
+const express = require('express');
+const bodyParser = require('body-parser');
+const sqlite3 = require('sqlite3').verbose();
+const app = express();
+const jsonParser = bodyParser.json();
 
-const app = express()
-const jsonParser = bodyParser.json()
-
-// Abre la base de datos de SQLite
+// Conexión y creación de la tabla
 let db = new sqlite3.Database('./base.sqlite3', (err) => {
     if (err) {
-        console.error(err.message)
-    } else {
-        console.log('Conectado a la base de datos SQLite.')
+        console.error(err.message);
     }
+    console.log('Conectado a la base de datos SQLite.');
 
     db.run(`CREATE TABLE IF NOT EXISTS todos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,67 +17,58 @@ let db = new sqlite3.Database('./base.sqlite3', (err) => {
         created_at INTEGER
     )`, (err) => {
         if (err) {
-            console.error(err.message)
+            console.error(err.message);
         } else {
-            console.log('Tabla tareas creada o ya existente.')
+            console.log('Tabla "todos" creada o ya existente.');
         }
-    })
-})
+    });
+});
 
-// Endpoint raíz
-app.get('/', function (req, res) {
-    res.setHeader('Content-Type', 'application/json')
-    res.end(JSON.stringify({ status: 'ok2' }))
-})
-
-// Endpoint POST para insertar una nueva tarea
-app.post('/insert', jsonParser, function (req, res) {
-    const { todo } = req.body
-    console.log(todo)
+// Endpoint para insertar tareas
+app.post('/agrega_todo', jsonParser, (req, res) => {
+    const { todo } = req.body;
 
     if (!todo) {
-        res.status(400).json({ error: 'Falta información necesaria' })
-        return
+        return res.status(400).json({ error: 'Falta el campo "todo"' });
     }
 
-    const stmt = db.prepare('INSERT INTO todos (todo, created_at) VALUES (?, strftime("%s", "now"))')
+    const created_at = Math.floor(Date.now() / 1000);
+    const sql = 'INSERT INTO todos (todo, created_at) VALUES (?, ?)';
+    const params = [todo, created_at];
 
-    stmt.run(todo, function (err) {
+    db.run(sql, params, function (err) {
         if (err) {
-            console.error("Error al insertar:", err)
-            res.status(500).json({ error: 'Error al guardar en la base de datos' })
-            return
+            console.error(err.message);
+            return res.status(500).json({ error: 'Error al insertar' });
         }
 
-        console.log("Insert fue exitoso")
-        res.status(201).json({ id: this.lastID, todo })
-    })
+        res.status(201).json({
+            message: 'Tarea agregada correctamente',
+            id: this.lastID
+        });
+    });
+});
 
-    stmt.finalize()
-})
-
-// Endpoint GET para listar todas las tareas
+// Endpoint para listar tareas
 app.get('/listar_todos', (req, res) => {
     db.all('SELECT * FROM todos', [], (err, rows) => {
         if (err) {
-            res.status(500).json({ error: err.message })
-            return
+            console.error(err.message);
+            return res.status(500).json({ error: 'Error al obtener las tareas' });
         }
 
-        res.setHeader('Content-Type', 'application/json')
-        res.status(200).json(rows)
-    })
-})
+        res.status(200).json(rows);
+    });
+});
 
-// Endpoint extra de ejemplo
-app.post('/login', jsonParser, function (req, res) {
-    console.log(req.body)
-    res.setHeader('Content-Type', 'application/json')
-    res.end(JSON.stringify({ status: 'ok' }))
-})
+// Ruta raíz
+app.get('/', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ status: 'ok' }));
+});
 
-// Ejecutar servidor
-const port = process.env.PORT || 3000
+// Iniciar servidor (corregido para Render)
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
-    console.log(`Aplicación corriendo en http://localhost:${port}`)
-})
+    console.log(`Aplicación corriendo en http://localhost:${port}`);
+});
